@@ -1,12 +1,30 @@
-# Bambam
+# Bambam 
+## Tui easy configuration + 5 new extensions
 
 [![Build Status](https://github.com/porridge/bambam/actions/workflows/python-app.yml/badge.svg)](https://github.com/porridge/bambam/actions/workflows/python-app.yml)
 [![Translation Status](https://hosted.weblate.org/widgets/bambam/-/app-and-manpage/svg-badge.svg)](https://hosted.weblate.org/engage/bambam/)
+[![Current Fork Stage]Stage 1 
+# Fork goals/phases
+  Stage 1) Make simple animal sounds, instruments, drums, vehicles, and "silly stuff" (random fart noises and such) extensions
+  Stage 2) Default "bambam" terminal keybind that opens with cage - swaylock option so even if your baby types quit somehow (they will) youre good
+  Stage 3) Integrate more educational extensions with a similar style, i would not recommend this app to kids above 1.5-2 years old
 
+## (Future) educational edition 
+Children learn in a much different way than us adults, simple word-sight-sound associations are extremely effective for word development, phonetics and critical thinking skills.
+Shows like cocomelon, baby shark, etc do not provide the direct association young toddlers/kids need to increase their linguistic skills. This of course begs the question,
+how does randomly compiled crap like this do better? The way kids learn language is extremely less constrained due to a lack of understanding, does your 2 year old 
+know please means to graciously ask someone for something or do they know "peez=fruit pouch". My philosophy with this late stage addition is to take advantage of their
+norepinephrine + dopamine seeking behaviors that are intrinsic to modern day life regardles of circumstance. The keyboard mashing registers as a dopamine hit yet 
+subconsciously functions like a classic picture book (blue light filtering and low brightness optimization will be immediate in stage 1). the truth is, 
+if your child sees you using technology theyre gonna want in. But they cannot tell the difference between engineered useless dopamine hits vs learning with a dopamine appetizer
+
+## Psychology documentation references 
+
+
+ 
 Bambam is a simple baby keyboard (and gamepad) masher application that locks the keyboard and mouse and instead displays bright colors, pictures, and sounds.  While OSX has great programs like [AlphaBaby](http://www.kldickey.addr.com/alphababy/), the original author couldn't find anything for Linux and having wanted to learn Python for a while, Bambam was his excuse.
 
 ![Bambam screenshot](docs/bambam.png "Bambam screenshot")
-
 ## Installation
 
 ### From a distribution package
