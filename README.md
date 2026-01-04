@@ -1,5 +1,7 @@
 # Bambam Plus 
-## Tui easy configuration + 5 new extensions
+## Tui easy configuration 
+## New extensions 
+## Future educational mode
 
 [![Build Status](https://github.com/porridge/bambam/actions/workflows/python-app.yml/badge.svg)](https://github.com/porridge/bambam/actions/workflows/python-app.yml)
 [![Translation Status](https://hosted.weblate.org/widgets/bambam/-/app-and-manpage/svg-badge.svg)](https://hosted.weblate.org/engage/bambam/)
