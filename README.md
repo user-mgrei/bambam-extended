@@ -1,4 +1,4 @@
-# Bambam 
+# Bambam Plus 
 ## Tui easy configuration + 5 new extensions
 
 [![Build Status](https://github.com/porridge/bambam/actions/workflows/python-app.yml/badge.svg)](https://github.com/porridge/bambam/actions/workflows/python-app.yml)
@@ -27,6 +27,7 @@ https://www.nature.com/articles/s41598-023-34049-3
 
 https://pmc.ncbi.nlm.nih.gov/articles/PMC6335198/
 
+## ORIGINAL DOCS START vvvvv
  
 Bambam is a simple baby keyboard (and gamepad) masher application that locks the keyboard and mouse and instead displays bright colors, pictures, and sounds.  While OSX has great programs like [AlphaBaby](http://www.kldickey.addr.com/alphababy/), the original author couldn't find anything for Linux and having wanted to learn Python for a while, Bambam was his excuse.
 
