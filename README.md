@@ -21,8 +21,10 @@ if your child sees you using technology theyre gonna want in. But they cannot te
 ## Psychology documentation references 
 
 https://www.tandfonline.com/doi/full/10.1080/15475441.2019.1670184
+
 -note this next one is stupid because some moron thinks white kid brains are different. they're not and that person is stupid (still interesting)
 https://www.nature.com/articles/s41598-023-34049-3
+
 https://pmc.ncbi.nlm.nih.gov/articles/PMC6335198/
 
  
