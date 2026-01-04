@@ -3,7 +3,7 @@
 
 [![Build Status](https://github.com/porridge/bambam/actions/workflows/python-app.yml/badge.svg)](https://github.com/porridge/bambam/actions/workflows/python-app.yml)
 [![Translation Status](https://hosted.weblate.org/widgets/bambam/-/app-and-manpage/svg-badge.svg)](https://hosted.weblate.org/engage/bambam/)
-[![Current Fork Stage]Stage 1 
+[![Current Fork Stage 1]
 # Fork goals/phases
   Stage 1) Make simple animal sounds, instruments, drums, vehicles, and "silly stuff" (random fart noises and such) extensions
   Stage 2) Default "bambam" terminal keybind that opens with cage - swaylock option so even if your baby types quit somehow (they will) youre good
