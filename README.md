@@ -3,7 +3,7 @@
 
 [![Build Status](https://github.com/porridge/bambam/actions/workflows/python-app.yml/badge.svg)](https://github.com/porridge/bambam/actions/workflows/python-app.yml)
 [![Translation Status](https://hosted.weblate.org/widgets/bambam/-/app-and-manpage/svg-badge.svg)](https://hosted.weblate.org/engage/bambam/)
-[![Current Fork Stage 1]
+
 # Fork goals/phases
   Stage 1) Make simple animal sounds, instruments, drums, vehicles, and "silly stuff" (random fart noises and such) extensions
   Stage 2) Default "bambam" terminal keybind that opens with cage - swaylock option so even if your baby types quit somehow (they will) youre good
@@ -20,6 +20,10 @@ if your child sees you using technology theyre gonna want in. But they cannot te
 
 ## Psychology documentation references 
 
+https://www.tandfonline.com/doi/full/10.1080/15475441.2019.1670184
+-note this next one is stupid because some moron thinks white kid brains are different. they're not and that person is stupid (still interesting)
+https://www.nature.com/articles/s41598-023-34049-3
+https://pmc.ncbi.nlm.nih.gov/articles/PMC6335198/
 
  
 Bambam is a simple baby keyboard (and gamepad) masher application that locks the keyboard and mouse and instead displays bright colors, pictures, and sounds.  While OSX has great programs like [AlphaBaby](http://www.kldickey.addr.com/alphababy/), the original author couldn't find anything for Linux and having wanted to learn Python for a while, Bambam was his excuse.
