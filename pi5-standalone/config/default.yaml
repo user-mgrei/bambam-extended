@@ -1,0 +1,31 @@
+# BamBam Test Configuration
+# This file is used by the standalone test installation
+version: 1
+
+# Display settings
+display:
+  dark_mode: false
+  uppercase: false
+
+# Audio settings
+audio:
+  start_muted: false
+
+# Extension settings
+extension:
+  name: null  # Set to "alphanumeric-en_US" to enable
+
+# Mode settings (for future features)
+modes:
+  active: []
+  all_modes: false
+
+# Background settings (for future features)
+background:
+  image: null
+  change_interval: null
+
+# Mode rotation (for future features)
+mode_rotation:
+  enabled: false
+  keypress_range: [10, 20]
