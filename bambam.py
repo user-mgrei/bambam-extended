@@ -25,6 +25,7 @@ import gettext
 import logging
 import math
 import os
+from pathlib import Path
 import pygame
 from pygame.locals import Color, QUIT, KEYDOWN, MOUSEMOTION, MOUSEBUTTONDOWN, MOUSEBUTTONUP
 import random
@@ -39,8 +40,50 @@ except ImportError:
     _YAML_LOADED = False
 
 
+# Configuration file paths
+CONFIG_FILE = Path(__file__).parent / "bambam_config.yaml"
+USER_CONFIG_FILE = Path.home() / ".config" / "bambam" / "config.yaml"
+
+
 # noinspection PyPep8Naming
 def N_(s): return s
+
+
+def load_config_file():
+    """Load configuration from YAML file if available."""
+    if not _YAML_LOADED:
+        return {}
+
+    config_path = USER_CONFIG_FILE if USER_CONFIG_FILE.exists() else CONFIG_FILE
+
+    if not config_path.exists():
+        return {}
+
+    try:
+        with open(config_path, 'r') as f:
+            return yaml.safe_load(f) or {}
+    except Exception as e:
+        logging.warning("Could not load config file: %s", e)
+        return {}
+
+
+def find_background_images(directory):
+    """Find all image files in a directory for background rotation."""
+    if not directory:
+        return []
+
+    path = Path(directory)
+    if not path.exists():
+        return []
+
+    image_extensions = {'.png', '.jpg', '.jpeg', '.gif', '.bmp', '.tiff'}
+    images = []
+
+    for item in path.iterdir():
+        if item.is_file() and item.suffix.lower() in image_extensions:
+            images.append(str(item))
+
+    return sorted(images)
 
 
 # TRANSLATORS: command string to toggle sound.
@@ -199,11 +242,115 @@ class Bambam:
 
         self._event_count = self._random.randint(0, 2 * self._HUE_SPACE - 1)
 
+        # New features: background images and random mode/bg switching
+        self._config = {}
+        self._background_images = []
+        self._background_image_surface = None
+        self._keypress_count = 0
+        self._next_bg_change_count = 0
+        self._next_mode_change_count = 0
+        self._available_extensions = []
+        self._current_extension_index = 0
+        self._all_modes_enabled = False
+
     def _add_image_policy(self, name, policy):
         self._image_policies[name] = policy
 
     def _add_sound_policy(self, name, policy):
         self._sound_policies[name] = policy
+
+    def _load_background_image(self, image_path):
+        """Load and scale a background image to fit the screen."""
+        try:
+            if not image_path or not os.path.exists(image_path):
+                return None
+            img = pygame.image.load(image_path)
+            # Scale to fit screen while maintaining aspect ratio
+            img_rect = img.get_rect()
+            scale_x = self.display_width / img_rect.width
+            scale_y = self.display_height / img_rect.height
+            scale = min(scale_x, scale_y)
+            new_width = int(img_rect.width * scale)
+            new_height = int(img_rect.height * scale)
+            return pygame.transform.scale(img, (new_width, new_height))
+        except Exception as e:
+            logging.warning("Could not load background image %s: %s", image_path, e)
+            return None
+
+    def _setup_random_counters(self):
+        """Initialize counters for random background/mode changes."""
+        bg_config = self._config.get('background', {}).get('random_change', {})
+        if bg_config.get('enabled'):
+            min_kp = bg_config.get('min_keypresses', 20)
+            max_kp = bg_config.get('max_keypresses', 100)
+            self._next_bg_change_count = self._random.randint(min_kp, max_kp)
+        else:
+            self._next_bg_change_count = 0
+
+        mode_config = self._config.get('modes', {}).get('random_mode_change', {})
+        if mode_config.get('enabled'):
+            min_kp = mode_config.get('min_keypresses', 10)
+            max_kp = mode_config.get('max_keypresses', 50)
+            self._next_mode_change_count = self._random.randint(min_kp, max_kp)
+        else:
+            self._next_mode_change_count = 0
+
+    def _check_random_changes(self):
+        """Check if it's time for random background or mode change."""
+        # Check background change
+        bg_config = self._config.get('background', {}).get('random_change', {})
+        if bg_config.get('enabled') and self._background_images:
+            if self._keypress_count >= self._next_bg_change_count:
+                self._change_random_background()
+                min_kp = bg_config.get('min_keypresses', 20)
+                max_kp = bg_config.get('max_keypresses', 100)
+                self._next_bg_change_count = self._keypress_count + self._random.randint(min_kp, max_kp)
+
+        # Check mode change
+        mode_config = self._config.get('modes', {}).get('random_mode_change', {})
+        if mode_config.get('enabled') and len(self._available_extensions) > 1:
+            if self._keypress_count >= self._next_mode_change_count:
+                self._change_random_mode()
+                min_kp = mode_config.get('min_keypresses', 10)
+                max_kp = mode_config.get('max_keypresses', 50)
+                self._next_mode_change_count = self._keypress_count + self._random.randint(min_kp, max_kp)
+
+    def _change_random_background(self):
+        """Change to a random background image."""
+        if not self._background_images:
+            return
+        image_path = self._random.choice(self._background_images)
+        new_bg = self._load_background_image(image_path)
+        if new_bg:
+            self._background_image_surface = new_bg
+            self._apply_background_image()
+            logging.debug("Changed background to: %s", image_path)
+
+    def _change_random_mode(self):
+        """Change to a random extension/mode."""
+        if len(self._available_extensions) <= 1:
+            return
+        # Pick a different extension
+        current = self._current_extension_index
+        new_index = current
+        while new_index == current:
+            new_index = self._random.randint(0, len(self._available_extensions) - 1)
+        self._current_extension_index = new_index
+        new_ext = self._available_extensions[new_index]
+        logging.info("Changing mode to: %s", new_ext if new_ext else "default")
+        # Note: Full mode switching would require reloading resources
+        # For now, log the change - full implementation would need refactoring
+
+    def _apply_background_image(self):
+        """Apply the current background image to the background surface."""
+        if self._background_image_surface:
+            # Center the image on the background
+            img_rect = self._background_image_surface.get_rect()
+            x = (self.display_width - img_rect.width) // 2
+            y = (self.display_height - img_rect.height) // 2
+            self.background.fill(self.background_color)
+            self.background.blit(self._background_image_surface, (x, y))
+            self.screen.blit(self.background, (0, 0))
 
     def draw_dot(self):
         """
@@ -222,9 +369,15 @@ class Bambam:
         """
         Processes events from keyboard or joystick.
         """
+        # Increment keypress counter for random change tracking
+        self._keypress_count += 1
+
         # check for command words
         if event.type == KEYDOWN and event.unicode.isalpha():
             self._maybe_process_command(event.unicode)
+
+        # Check for random background/mode changes
+        self._check_random_changes()
 
         # Clear the screen 10% of the time
         if self._random.randint(0, 10) == 1:
@@ -334,6 +487,22 @@ class Bambam:
         # noinspection PyArgumentList
         self.background = pygame.Surface(self.screen.get_size()).convert()
         self.background.fill(self.background_color)
+
+        # Load background image if configured
+        bg_config = self._config.get('background', {})
+        bg_image_path = bg_config.get('image_path')
+        if bg_image_path:
+            self._background_image_surface = self._load_background_image(bg_image_path)
+            if self._background_image_surface:
+                self._apply_background_image()
+                logging.info("Loaded background image: %s", bg_image_path)
+
+        # Load background images directory for rotation
+        bg_images_dir = bg_config.get('images_directory')
+        if bg_images_dir:
+            self._background_images = find_background_images(bg_images_dir)
+            logging.info("Found %d background images in %s", len(self._background_images), bg_images_dir)
+
         caption_font = pygame.font.SysFont(None, 20)
         caption_label = caption_font.render(
             caption_format % " ".join(_(s).lower() for s in command_strings),
@@ -553,6 +722,9 @@ class Bambam:
         self._add_base_dir(os.path.join(os.path.dirname(program_base), 'share', 'bambam'))
         self._add_base_dir(os.getenv('XDG_DATA_HOME', os.path.expanduser('~/.local/share/bambam')))
 
+        # Load configuration file
+        self._config = load_config_file()
+
         parser = argparse.ArgumentParser(
             description=_('Keyboard mashing and doodling game for babies and toddlers.'))
         if not _YAML_LOADED:
@@ -579,7 +751,53 @@ class Bambam:
                             help=argparse.SUPPRESS)
         parser.add_argument('--trace', action='store_true',
                             help=_('Print detailed messages about game internals.'))
+        parser.add_argument('--background-image', type=str,
+                            help=_('Path to a background image file.'))
+        parser.add_argument('--background-images-dir', type=str,
+                            help=_('Directory containing background images for rotation.'))
+        parser.add_argument('--all-modes', action='store_true',
+                            help=_('Enable all available extension modes.'))
         args = parser.parse_args()
+
+        # Merge config file settings with command line args (CLI takes precedence)
+        general_config = self._config.get('general', {})
+        if not args.dark and general_config.get('dark_mode'):
+            args.dark = True
+        if not args.uppercase and general_config.get('uppercase'):
+            args.uppercase = True
+        if not args.mute and general_config.get('mute'):
+            args.mute = True
+        if not args.sticky_mouse and general_config.get('sticky_mouse'):
+            args.sticky_mouse = True
+        if not args.deterministic_sounds and general_config.get('deterministic_sounds'):
+            args.deterministic_sounds = True
+
+        # Handle background settings from config
+        bg_config = self._config.get('background', {})
+        if not args.background_image and bg_config.get('image_path'):
+            args.background_image = bg_config['image_path']
+        if not args.background_images_dir and bg_config.get('images_directory'):
+            args.background_images_dir = bg_config['images_directory']
+
+        # Store background settings in config for later use
+        if args.background_image:
+            if 'background' not in self._config:
+                self._config['background'] = {}
+            self._config['background']['image_path'] = args.background_image
+        if args.background_images_dir:
+            if 'background' not in self._config:
+                self._config['background'] = {}
+            self._config['background']['images_directory'] = args.background_images_dir
+
+        # Handle all-modes setting
+        modes_config = self._config.get('modes', {})
+        if args.all_modes or modes_config.get('all_modes_enabled'):
+            self._all_modes_enabled = True
+
+        # Handle extension from config
+        if not hasattr(args, 'extension') or not args.extension:
+            if modes_config.get('active_extension'):
+                args.extension = modes_config['active_extension']
 
         log_level = logging.DEBUG if args.trace else logging.INFO
         logging.basicConfig(level=log_level, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
@@ -591,6 +809,12 @@ class Bambam:
 
         self._load_resources(args)
         self._prepare_screen(args)
+
+        # Setup random change counters
+        self._setup_random_counters()
+
+        # Detect available extensions for mode rotation
+        self._detect_available_extensions()
 
         pygame.event.set_grab(True)
         if hasattr(pygame.event, 'set_keyboard_grab'):
@@ -642,6 +866,20 @@ class Bambam:
                     self._bump_event_count()
                     if not self._sticky_mouse:
                         mouse_pressed = False
+
+    def _detect_available_extensions(self):
+        """Detect all available extensions for mode rotation."""
+        self._available_extensions = [None]  # None = default mode (no extension)
+        for ext_dir in self.extensions_dirs:
+            if os.path.exists(ext_dir):
+                for item in os.listdir(ext_dir):
+                    item_path = os.path.join(ext_dir, item)
+                    if os.path.isdir(item_path):
+                        event_map = os.path.join(item_path, 'event_map.yaml')
+                        if os.path.exists(event_map):
+                            if item not in self._available_extensions:
+                                self._available_extensions.append(item)
+        logging.info("Available extensions: %s", self._available_extensions)
 
     def _bump_event_count(self):
         self._event_count = (self._event_count + 1) % (self._HUE_SPACE * 2)

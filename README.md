@@ -1,7 +1,60 @@
-# Bambam Plus 
-## Tui easy configuration 
-## New extensions 
-## Future educational mode
+# BamBam Plus 
+
+🎮 A keyboard mashing and doodling game for babies and toddlers.
+
+## New Features in This Fork
+
+### TUI Configuration Menu
+Easy-to-use terminal interface for configuration:
+```bash
+python3 bambam_tui.py
+```
+
+### Cage Compositor Support (Secure Kiosk Mode)
+Run in a secure Wayland kiosk that prevents children from accessing the desktop:
+```bash
+python3 bambam_tui.py --cage
+# or directly:
+cage ./bambam_launcher.sh
+```
+
+### Background Images
+Set custom background images or enable random background rotation:
+```bash
+python3 bambam.py --background-image /path/to/image.png
+python3 bambam.py --background-images-dir /path/to/images/
+```
+
+### Random Mode/Background Switching
+Configure automatic mode and background changes after a random number of keypresses via the TUI or config file.
+
+### Configuration File
+All settings can be saved in `~/.config/bambam/config.yaml`:
+```yaml
+general:
+  dark_mode: true
+  uppercase: false
+modes:
+  active_extension: alphanumeric-en_US
+  random_mode_change:
+    enabled: true
+    min_keypresses: 10
+    max_keypresses: 50
+background:
+  images_directory: /path/to/backgrounds
+  random_change:
+    enabled: true
+```
+
+## Documentation
+
+- **[ARCHITECTURE.md](ARCHITECTURE.md)** - Complete technical documentation
+- **[PI5_INSTALLATION.md](PI5_INSTALLATION.md)** - Raspberry Pi 5 installation guide
+- **[EXTENSIONS.md](EXTENSIONS.md)** - Creating custom extensions
+
+---
+
+## Fork Goals (Development Phases)
 
 [![Build Status](https://github.com/porridge/bambam/actions/workflows/python-app.yml/badge.svg)](https://github.com/porridge/bambam/actions/workflows/python-app.yml)
 [![Translation Status](https://hosted.weblate.org/widgets/bambam/-/app-and-manpage/svg-badge.svg)](https://hosted.weblate.org/engage/bambam/)

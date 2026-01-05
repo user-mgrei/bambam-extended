@@ -1,0 +1,75 @@
+# BamBam Plus Configuration File
+# Edit this file directly or use the TUI: python3 bambam_tui.py
+
+general:
+  dark_mode: false
+  uppercase: false
+  mute: false
+  sticky_mouse: false
+  deterministic_sounds: false
+
+# Mode/Extension settings
+modes:
+  # Currently active extension (null for default behavior)
+  active_extension: null
+  
+  # List of all installed extensions (auto-detected)
+  available_extensions:
+    - alphanumeric-en_US
+  
+  # Run all available modes/extensions in rotation
+  all_modes_enabled: false
+  
+  # Random mode switching based on keypress count
+  random_mode_change:
+    enabled: false
+    min_keypresses: 10
+    max_keypresses: 50
+
+# Background settings
+background:
+  # Custom background image path (null for default solid color)
+  image_path: null
+  
+  # Directory containing background images for rotation
+  images_directory: null
+  
+  # Random background change based on keypress count
+  random_change:
+    enabled: false
+    min_keypresses: 20
+    max_keypresses: 100
+
+# Cage compositor settings (for secure kiosk mode)
+cage:
+  enabled: true
+  # Use swaylock as fallback when child quits game
+  use_swaylock: true
+  # Lock screen password (only used if use_swaylock is true)
+  # Leave empty to use system default
+  swaylock_config: ""
+
+# Audio settings
+audio:
+  # Master volume (0.0 to 1.0)
+  volume: 1.0
+  # Prefer OGG over WAV (better for Pi)
+  prefer_ogg: true
+
+# Display settings
+display:
+  # Maximum image width in pixels (affects memory usage)
+  max_image_width: 700
+  # Target FPS (60 is default, lower for Pi Zero)
+  target_fps: 60
+
+# Advanced settings
+advanced:
+  # Random seed for reproducible behavior (null for random)
+  random_seed: null
+  # Enable debug logging
+  trace: false
+  # Blacklist patterns for sounds (glob patterns)
+  sound_blacklist: []
+  # Blacklist patterns for images (glob patterns)
+  image_blacklist: []
