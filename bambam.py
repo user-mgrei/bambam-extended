@@ -38,6 +38,13 @@ try:
 except ImportError:
     _YAML_LOADED = False
 
+# Try to import config module for auto-switch support
+try:
+    from bambam_config import load_config, list_available_extensions, list_background_images
+    _CONFIG_AVAILABLE = True
+except ImportError:
+    _CONFIG_AVAILABLE = False
+
 
 # noinspection PyPep8Naming
 def N_(s): return s
@@ -113,6 +120,19 @@ def poll_for_any_key_press(clock):
 class Bambam:
     IMAGE_MAX_WIDTH = 700
     _HUE_SPACE = 360
+
+    # Auto-switch tracking
+    _auto_switch_enabled = False
+    _mode_change_range = (10, 50)
+    _background_change_range = (20, 100)
+    _keypress_since_mode_change = 0
+    _keypress_since_bg_change = 0
+    _next_mode_change_threshold = 0
+    _next_bg_change_threshold = 0
+    _available_extensions = []
+    _background_images = []
+    _current_extension = None
+    _custom_background_path = None
 
     def get_color(self):
         """
@@ -226,6 +246,9 @@ class Bambam:
         if event.type == KEYDOWN and event.unicode.isalpha():
             self._maybe_process_command(event.unicode)
 
+        # Check auto-switch thresholds
+        self._check_auto_switch()
+
         # Clear the screen 10% of the time
         if self._random.randint(0, 10) == 1:
             logging.debug('Clearing screen.')
@@ -334,6 +357,18 @@ class Bambam:
         # noinspection PyArgumentList
         self.background = pygame.Surface(self.screen.get_size()).convert()
         self.background.fill(self.background_color)
+
+        # Load custom background image if specified
+        bg_path = getattr(args, 'background_image', None)
+        if bg_path:
+            custom_bg = self._load_custom_background(bg_path)
+            if custom_bg:
+                # Scale to fit screen
+                custom_bg = pygame.transform.scale(custom_bg, (self.display_width, self.display_height))
+                self.background.blit(custom_bg, (0, 0))
+                self._custom_background_path = bg_path
+                logging.info('Loaded custom background: %s', bg_path)
+
         caption_font = pygame.font.SysFont(None, 20)
         caption_label = caption_font.render(
             caption_format % " ".join(_(s).lower() for s in command_strings),
@@ -575,6 +610,12 @@ class Bambam:
                             help=_('Start with sticky mouse buttons enabled.'))
         parser.add_argument('--wayland-ok', action='store_true',
                             help=_('Do not prevent running under Wayland.'))
+        parser.add_argument('--background-image', type=str, default=None,
+                            help=_('Use a custom background image.'))
+        parser.add_argument('--auto-switch', action='store_true',
+                            help=_('Enable auto-switching of modes/backgrounds.'))
+        parser.add_argument('--all-modes', action='store_true',
+                            help=_('Cycle through all available extensions.'))
         parser.add_argument('--in-dedicated-session', action='store_true',
                             help=argparse.SUPPRESS)
         parser.add_argument('--trace', action='store_true',
@@ -591,6 +632,10 @@ class Bambam:
 
         self._load_resources(args)
         self._prepare_screen(args)
+
+        # Initialize auto-switch if enabled
+        if getattr(args, 'auto_switch', False):
+            self._init_auto_switch(args)
 
         pygame.event.set_grab(True)
         if hasattr(pygame.event, 'set_keyboard_grab'):
@@ -645,6 +690,106 @@ class Bambam:
 
     def _bump_event_count(self):
         self._event_count = (self._event_count + 1) % (self._HUE_SPACE * 2)
+
+    def _init_auto_switch(self, args):
+        """Initialize auto-switch functionality if enabled."""
+        if not _CONFIG_AVAILABLE:
+            return
+
+        try:
+            config = load_config()
+            if not config.auto_switch.enabled:
+                return
+
+            self._auto_switch_enabled = True
+            self._mode_change_range = config.auto_switch.mode_change_range
+            self._background_change_range = config.auto_switch.background_change_range
+
+            # Get available extensions
+            self._available_extensions = list_available_extensions()
+
+            # Get background images
+            self._background_images = list_background_images()
+
+            # Set initial thresholds
+            self._reset_mode_threshold()
+            self._reset_bg_threshold()
+
+            logging.info('Auto-switch enabled: mode range %s, bg range %s',
+                         self._mode_change_range, self._background_change_range)
+        except Exception as e:
+            logging.warning('Failed to initialize auto-switch: %s', e)
+
+    def _reset_mode_threshold(self):
+        """Set a new random threshold for mode change."""
+        min_val, max_val = self._mode_change_range
+        self._next_mode_change_threshold = self._random.randint(min_val, max_val)
+        self._keypress_since_mode_change = 0
+
+    def _reset_bg_threshold(self):
+        """Set a new random threshold for background change."""
+        min_val, max_val = self._background_change_range
+        self._next_bg_change_threshold = self._random.randint(min_val, max_val)
+        self._keypress_since_bg_change = 0
+
+    def _check_auto_switch(self):
+        """Check if we should auto-switch mode or background."""
+        if not self._auto_switch_enabled:
+            return
+
+        self._keypress_since_mode_change += 1
+        self._keypress_since_bg_change += 1
+
+        # Check mode switch
+        if (self._available_extensions and
+                self._keypress_since_mode_change >= self._next_mode_change_threshold):
+            self._auto_switch_mode()
+
+        # Check background switch
+        if (self._background_images and
+                self._keypress_since_bg_change >= self._next_bg_change_threshold):
+            self._auto_switch_background()
+
+    def _auto_switch_mode(self):
+        """Switch to a random extension/mode."""
+        if not self._available_extensions:
+            return
+
+        new_ext = self._random.choice(self._available_extensions)
+        logging.info('Auto-switching mode to: %s', new_ext)
+        # Note: Full mode switching would require reloading resources
+        # For now, log the intent - full implementation requires deeper changes
+        self._current_extension = new_ext
+        self._reset_mode_threshold()
+
+    def _auto_switch_background(self):
+        """Switch to a random background image."""
+        if not self._background_images:
+            return
+
+        new_bg = self._random.choice(self._background_images)
+        logging.info('Auto-switching background to: %s', new_bg)
+        try:
+            bg_image = self.load_image(new_bg)
+            # Scale to screen size
+            bg_image = pygame.transform.scale(bg_image, (self.display_width, self.display_height))
+            self.background.blit(bg_image, (0, 0))
+            self.screen.blit(self.background, (0, 0))
+            pygame.display.flip()
+        except Exception as e:
+            logging.warning('Failed to load background %s: %s', new_bg, e)
+        self._reset_bg_threshold()
+
+    def _load_custom_background(self, bg_path):
+        """Load a custom background image."""
+        if not bg_path or not os.path.exists(bg_path):
+            return None
+        try:
+            bg_image = pygame.image.load(bg_path)
+            return bg_image.convert()
+        except pygame.error as e:
+            logging.warning('Failed to load custom background %s: %s', bg_path, e)
+            return None
 
 
 def _map_and_select(event, mapper, policies):

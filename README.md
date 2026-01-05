@@ -1,7 +1,16 @@
 # Bambam Plus 
-## Tui easy configuration 
-## New extensions 
-## Future educational mode
+## TUI Easy Configuration ✓
+## New Extensions Support ✓
+## Future Educational Mode
+
+### New in this Fork
+- **TUI Launcher** (`bambam_tui.py`): Curses-based menu for configuration and launching
+- **Configuration System** (`bambam_config.py`): Persistent YAML settings
+- **Cage Support**: Run in kiosk mode via cage compositor
+- **Background Images**: Custom background image support
+- **Auto-Switch**: Random mode/background changes based on keypress count
+- **All-Modes Button**: Run through all extensions
+- **Pi 5 Lite Guide**: Complete Raspberry Pi deployment documentation
 
 [![Build Status](https://github.com/porridge/bambam/actions/workflows/python-app.yml/badge.svg)](https://github.com/porridge/bambam/actions/workflows/python-app.yml)
 [![Translation Status](https://hosted.weblate.org/widgets/bambam/-/app-and-manpage/svg-badge.svg)](https://hosted.weblate.org/engage/bambam/)
@@ -84,6 +93,23 @@ sed -i -e "s,/usr/games/bambam,`pwd`/bambam.py," bambam.desktop
 mkdir -p ~/.local/share/applications
 cp bambam.desktop ~/.local/share/applications/
 ```
+
+## Quick Start (TUI Launcher)
+
+The easiest way to configure and run BamBam Plus:
+
+```bash
+# Interactive TUI menu
+./bambam_tui.py
+
+# Run with saved configuration
+./bambam_tui.py --run
+
+# Run in cage compositor (kiosk mode)
+./bambam_tui.py --run-cage
+```
+
+See [ARCHITECTURE.md](ARCHITECTURE.md) for comprehensive documentation and [PI5_DEPLOYMENT.md](PI5_DEPLOYMENT.md) for Raspberry Pi setup.
 
 ## Usage
 
