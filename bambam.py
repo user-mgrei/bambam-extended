@@ -121,19 +121,6 @@ class Bambam:
     IMAGE_MAX_WIDTH = 700
     _HUE_SPACE = 360
 
-    # Auto-switch tracking
-    _auto_switch_enabled = False
-    _mode_change_range = (10, 50)
-    _background_change_range = (20, 100)
-    _keypress_since_mode_change = 0
-    _keypress_since_bg_change = 0
-    _next_mode_change_threshold = 0
-    _next_bg_change_threshold = 0
-    _available_extensions = []
-    _background_images = []
-    _current_extension = None
-    _custom_background_path = None
-
     def get_color(self):
         """
         Return bright color varying over time.
@@ -219,6 +206,19 @@ class Bambam:
 
         self._event_count = self._random.randint(0, 2 * self._HUE_SPACE - 1)
 
+        # Auto-switch tracking (instance variables)
+        self._auto_switch_enabled = False
+        self._mode_change_range = (10, 50)
+        self._background_change_range = (20, 100)
+        self._keypress_since_mode_change = 0
+        self._keypress_since_bg_change = 0
+        self._next_mode_change_threshold = 0
+        self._next_bg_change_threshold = 0
+        self._available_extensions = []
+        self._background_images = []
+        self._current_extension = None
+        self._custom_background_path = None
+
     def _add_image_policy(self, name, policy):
         self._image_policies[name] = policy
 
@@ -296,8 +296,11 @@ class Bambam:
         """
         Prints an image at a random location.
         """
-        w = self._random.randint(0, self.display_width - img.get_width() - 1)
-        h = self._random.randint(0, self.display_height - img.get_height() - 1)
+        # Ensure we have valid bounds for random position
+        max_w = max(0, self.display_width - img.get_width() - 1)
+        max_h = max(0, self.display_height - img.get_height() - 1)
+        w = self._random.randint(0, max_w) if max_w > 0 else 0
+        h = self._random.randint(0, max_h) if max_h > 0 else 0
         logging.debug('Blitting at %s image %s', (w, h), img)
         self.screen.blit(img, (w, h))
 
@@ -521,6 +524,8 @@ class Bambam:
             print(_('Error: pygame fonts not available. Exiting.'), file=sys.stderr)
             sys.exit(1)
         self._sticky_mouse = args.sticky_mouse
+        # Initialize sound_muted to False by default (will be set properly if sound works)
+        self.sound_muted = False
         if not self._try_init_sound():
             print(_('Warning: Sound support not available.'), file=sys.stderr)
             self._sound_enabled = False
@@ -693,32 +698,46 @@ class Bambam:
 
     def _init_auto_switch(self, args):
         """Initialize auto-switch functionality if enabled."""
-        if not _CONFIG_AVAILABLE:
+        # Enable if CLI flag is set OR if config has it enabled
+        cli_enabled = getattr(args, 'auto_switch', False)
+
+        if _CONFIG_AVAILABLE:
+            try:
+                config = load_config()
+                config_enabled = config.auto_switch.enabled
+                self._mode_change_range = config.auto_switch.mode_change_range
+                self._background_change_range = config.auto_switch.background_change_range
+            except Exception as e:
+                logging.warning('Failed to load auto-switch config: %s', e)
+                config_enabled = False
+        else:
+            config_enabled = False
+
+        # Enable if either CLI or config enables it
+        if not (cli_enabled or config_enabled):
             return
 
-        try:
-            config = load_config()
-            if not config.auto_switch.enabled:
-                return
+        self._auto_switch_enabled = True
 
-            self._auto_switch_enabled = True
-            self._mode_change_range = config.auto_switch.mode_change_range
-            self._background_change_range = config.auto_switch.background_change_range
+        # Get available extensions
+        if _CONFIG_AVAILABLE:
+            try:
+                self._available_extensions = list_available_extensions()
+                self._background_images = list_background_images()
+            except Exception as e:
+                logging.warning('Failed to list extensions/backgrounds: %s', e)
+                self._available_extensions = []
+                self._background_images = []
+        else:
+            self._available_extensions = []
+            self._background_images = []
 
-            # Get available extensions
-            self._available_extensions = list_available_extensions()
+        # Set initial thresholds
+        self._reset_mode_threshold()
+        self._reset_bg_threshold()
 
-            # Get background images
-            self._background_images = list_background_images()
-
-            # Set initial thresholds
-            self._reset_mode_threshold()
-            self._reset_bg_threshold()
-
-            logging.info('Auto-switch enabled: mode range %s, bg range %s',
-                         self._mode_change_range, self._background_change_range)
-        except Exception as e:
-            logging.warning('Failed to initialize auto-switch: %s', e)
+        logging.info('Auto-switch enabled: mode range %s, bg range %s',
+                     self._mode_change_range, self._background_change_range)
 
     def _reset_mode_threshold(self):
         """Set a new random threshold for mode change."""
@@ -765,18 +784,20 @@ class Bambam:
     def _auto_switch_background(self):
         """Switch to a random background image."""
         if not self._background_images:
+            self._reset_bg_threshold()
             return
 
         new_bg = self._random.choice(self._background_images)
         logging.info('Auto-switching background to: %s', new_bg)
         try:
-            bg_image = self.load_image(new_bg)
+            bg_image = pygame.image.load(new_bg)
+            bg_image = bg_image.convert()
             # Scale to screen size
             bg_image = pygame.transform.scale(bg_image, (self.display_width, self.display_height))
             self.background.blit(bg_image, (0, 0))
             self.screen.blit(self.background, (0, 0))
             pygame.display.flip()
-        except Exception as e:
+        except (pygame.error, FileNotFoundError, OSError) as e:
             logging.warning('Failed to load background %s: %s', new_bg, e)
         self._reset_bg_threshold()
 
