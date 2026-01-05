@@ -38,9 +38,21 @@ try:
 except ImportError:
     _YAML_LOADED = False
 
+try:
+    import json
+    _JSON_LOADED = True
+except ImportError:
+    _JSON_LOADED = False
+
 
 # noinspection PyPep8Naming
 def N_(s): return s
+
+
+# Configuration file path
+CONFIG_FILE = os.path.expanduser(
+    os.environ.get('XDG_CONFIG_HOME', '~/.config') + '/bambam/config.json'
+)
 
 
 # TRANSLATORS: command string to toggle sound.
@@ -187,6 +199,7 @@ class Bambam:
 
         self.data_dirs = []
         self.extensions_dirs = []
+        self.backgrounds_dirs = []
 
         self.screen = None
         self.display_height = None
@@ -199,11 +212,171 @@ class Bambam:
 
         self._event_count = self._random.randint(0, 2 * self._HUE_SPACE - 1)
 
+        # New features: keypress triggers
+        self._keypress_count = 0
+        self._next_mode_change_at = None
+        self._next_bg_change_at = None
+
+        # Background images
+        self._background_images = []
+        self._current_background_idx = 0
+
+        # All modes feature
+        self._available_extensions = []
+        self._current_extension_idx = 0
+        self._all_modes_enabled = False
+
+        # Loaded runtime config
+        self._runtime_config = None
+
     def _add_image_policy(self, name, policy):
         self._image_policies[name] = policy
 
     def _add_sound_policy(self, name, policy):
         self._sound_policies[name] = policy
+
+    def _load_runtime_config(self):
+        """Load runtime configuration from JSON file if available."""
+        if not _JSON_LOADED or not os.path.exists(CONFIG_FILE):
+            return None
+        try:
+            with open(CONFIG_FILE, 'r') as f:
+                return json.load(f)
+        except (json.JSONDecodeError, IOError):
+            return None
+
+    def _init_keypress_triggers(self, args):
+        """Initialize keypress-based triggers from config."""
+        config = self._runtime_config
+        if not config:
+            return
+
+        triggers = config.get('keypress_triggers', {})
+
+        # Mode change trigger
+        if triggers.get('mode_change_enabled', False):
+            min_val = triggers.get('mode_change_min', 50)
+            max_val = triggers.get('mode_change_max', 150)
+            self._next_mode_change_at = self._random.randint(min_val, max_val)
+            logging.debug('Next mode change at keypress %d', self._next_mode_change_at)
+
+        # Background change trigger
+        if triggers.get('background_change_enabled', False):
+            min_val = triggers.get('background_change_min', 30)
+            max_val = triggers.get('background_change_max', 100)
+            self._next_bg_change_at = self._random.randint(min_val, max_val)
+            logging.debug('Next background change at keypress %d', self._next_bg_change_at)
+
+    def _check_keypress_triggers(self):
+        """Check and handle keypress triggers for mode/background changes."""
+        self._keypress_count += 1
+
+        # Check mode change trigger
+        if self._next_mode_change_at and self._keypress_count >= self._next_mode_change_at:
+            self._trigger_mode_change()
+
+        # Check background change trigger
+        if self._next_bg_change_at and self._keypress_count >= self._next_bg_change_at:
+            self._trigger_background_change()
+
+    def _trigger_mode_change(self):
+        """Trigger a random mode/extension change."""
+        if not self._available_extensions:
+            return
+
+        # Pick a different extension
+        if len(self._available_extensions) > 1:
+            new_idx = self._random.randint(0, len(self._available_extensions) - 1)
+            while new_idx == self._current_extension_idx:
+                new_idx = self._random.randint(0, len(self._available_extensions) - 1)
+            self._current_extension_idx = new_idx
+            logging.info('Mode changed to: %s', self._available_extensions[self._current_extension_idx])
+
+        # Schedule next mode change
+        config = self._runtime_config
+        if config:
+            triggers = config.get('keypress_triggers', {})
+            min_val = triggers.get('mode_change_min', 50)
+            max_val = triggers.get('mode_change_max', 150)
+            self._next_mode_change_at = self._keypress_count + self._random.randint(min_val, max_val)
+
+    def _trigger_background_change(self):
+        """Trigger a random background change."""
+        if not self._background_images:
+            return
+
+        # Pick a different background
+        if len(self._background_images) > 1:
+            new_idx = self._random.randint(0, len(self._background_images) - 1)
+            while new_idx == self._current_background_idx:
+                new_idx = self._random.randint(0, len(self._background_images) - 1)
+            self._current_background_idx = new_idx
+            self._apply_background_image()
+            logging.info('Background changed to index: %d', self._current_background_idx)
+
+        # Schedule next background change
+        config = self._runtime_config
+        if config:
+            triggers = config.get('keypress_triggers', {})
+            min_val = triggers.get('background_change_min', 30)
+            max_val = triggers.get('background_change_max', 100)
+            self._next_bg_change_at = self._keypress_count + self._random.randint(min_val, max_val)
+
+    def _load_background_images(self, args):
+        """Load available background images."""
+        self._background_images = []
+
+        # Check for custom background from args
+        if hasattr(args, 'background') and args.background:
+            if os.path.exists(args.background):
+                try:
+                    bg = pygame.image.load(args.background)
+                    self._background_images.append(bg)
+                except pygame.error as e:
+                    logging.warning('Failed to load background %s: %s', args.background, e)
+
+        # Load backgrounds from backgrounds directories
+        for bg_dir in self.backgrounds_dirs:
+            if not os.path.isdir(bg_dir):
+                continue
+            for fname in os.listdir(bg_dir):
+                if fname.lower().endswith(('.png', '.jpg', '.jpeg', '.gif', '.bmp')):
+                    try:
+                        bg_path = os.path.join(bg_dir, fname)
+                        bg = pygame.image.load(bg_path)
+                        self._background_images.append(bg)
+                    except pygame.error as e:
+                        logging.warning('Failed to load background %s: %s', fname, e)
+
+    def _apply_background_image(self):
+        """Apply the current background image to the screen."""
+        if not self._background_images:
+            return
+
+        bg_img = self._background_images[self._current_background_idx]
+        # Scale to screen size
+        scaled_bg = pygame.transform.scale(bg_img, (self.display_width, self.display_height))
+        self.background.blit(scaled_bg, (0, 0))
+        self.screen.blit(self.background, (0, 0))
+        pygame.display.flip()
+
+    def _discover_extensions(self):
+        """Discover all available extensions."""
+        self._available_extensions = []
+        seen = set()
+
+        for ext_dir in self.extensions_dirs:
+            if not os.path.isdir(ext_dir):
+                continue
+            for name in os.listdir(ext_dir):
+                ext_path = os.path.join(ext_dir, name)
+                event_map = os.path.join(ext_path, 'event_map.yaml')
+                if os.path.isdir(ext_path) and os.path.exists(event_map):
+                    if name not in seen:
+                        self._available_extensions.append(name)
+                        seen.add(name)
+
+        logging.debug('Discovered extensions: %s', self._available_extensions)
 
     def draw_dot(self):
         """
@@ -222,6 +395,9 @@ class Bambam:
         """
         Processes events from keyboard or joystick.
         """
+        # Check keypress triggers for mode/background changes
+        self._check_keypress_triggers()
+
         # check for command words
         if event.type == KEYDOWN and event.unicode.isalpha():
             self._maybe_process_command(event.unicode)
@@ -470,6 +646,11 @@ class Bambam:
             print(_('Using extension directory %s') % extensions_subdir)
             self.extensions_dirs.append(extensions_subdir)
 
+        backgrounds_subdir = os.path.join(base_dir, 'backgrounds')
+        if os.path.isdir(backgrounds_subdir):
+            print(_('Using backgrounds directory %s') % backgrounds_subdir)
+            self.backgrounds_dirs.append(backgrounds_subdir)
+
     def _try_init_sound(self):
         for _ in range(30):
             if pygame.mixer and pygame.mixer.get_init():
@@ -518,6 +699,17 @@ class Bambam:
                     self.load_sound,
                     _("All extension sounds failed to load."))
                 self._add_sound_policy('named_file', NamedFilePolicy(extension_sounds))
+
+            # Load extension images for audio+image pairing (distinct mode)
+            extension_images = self.load_items(
+                self.glob_extension(['.gif', '.jpg', '.jpeg', '.png', '.tif', '.tiff'], args.extension),
+                [],
+                self.load_image,
+                _("Extension images not found (optional)."))
+            if extension_images:
+                self._add_image_policy('named_file', NamedFilePolicy(extension_images))
+                print(_('Loaded %d extension images.') % len(extension_images))
+
             self._sound_mapper, self._image_mapper = self._get_extension_mappers(args.extension)
             print(_('Using extension "%s".') % args.extension)
         else:
@@ -579,10 +771,26 @@ class Bambam:
                             help=argparse.SUPPRESS)
         parser.add_argument('--trace', action='store_true',
                             help=_('Print detailed messages about game internals.'))
+        parser.add_argument('--background', type=str, default=None,
+                            help=_('Custom background image file path.'))
+        parser.add_argument('--all-modes', action='store_true',
+                            help=_('Enable all modes cycling.'))
+        parser.add_argument('--mode-change-min', type=int, default=50,
+                            help=_('Minimum keypresses before random mode change.'))
+        parser.add_argument('--mode-change-max', type=int, default=150,
+                            help=_('Maximum keypresses before random mode change.'))
+        parser.add_argument('--bg-change-min', type=int, default=30,
+                            help=_('Minimum keypresses before random background change.'))
+        parser.add_argument('--bg-change-max', type=int, default=100,
+                            help=_('Maximum keypresses before random background change.'))
         args = parser.parse_args()
 
         log_level = logging.DEBUG if args.trace else logging.INFO
         logging.basicConfig(level=log_level, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
+
+        # Load runtime config for new features
+        self._runtime_config = self._load_runtime_config()
+
         pygame.init()
 
         pygame.display.set_mode((0, 0), pygame.FULLSCREEN)
@@ -591,6 +799,14 @@ class Bambam:
 
         self._load_resources(args)
         self._prepare_screen(args)
+
+        # Initialize new features
+        self._discover_extensions()
+        self._load_background_images(args)
+        self._init_keypress_triggers(args)
+
+        # Set all-modes flag
+        self._all_modes_enabled = args.all_modes
 
         pygame.event.set_grab(True)
         if hasattr(pygame.event, 'set_keyboard_grab'):
