@@ -22,6 +22,7 @@ from typing import List, Optional, Callable
 from bambam_config import (
     load_config, save_config,
     discover_extensions, discover_backgrounds,
+    ExtensionConfig,
 )
 
 
@@ -300,28 +301,40 @@ class BambamTUI:
         self.message_is_error = False
 
     def _set_extension(self, ext_name: str):
-        """Set the current extension."""
+        """Set the current extension and ensure ExtensionConfig exists."""
         self.config.current_extension = ext_name
+        # Ensure an ExtensionConfig exists for this extension
+        if ext_name:
+            self._get_or_create_ext_config(ext_name)
         self.message = f"Extension set to: {ext_name or '(none)'}"
         self.message_is_error = False
 
+    def _get_or_create_ext_config(self, ext_name: str):
+        """Get or create ExtensionConfig for the given extension name."""
+        for ext in self.config.extensions:
+            if ext.name == ext_name:
+                return ext
+        # Create new ExtensionConfig for this extension
+        new_ext_config = ExtensionConfig(name=ext_name)
+        self.config.extensions.append(new_ext_config)
+        return new_ext_config
+
     def _get_current_ext_config(self):
-        """Get config for current extension."""
+        """Get config for current extension, creating one if needed."""
         if not self.config.current_extension:
             return None
-        for ext in self.config.extensions:
-            if ext.name == self.config.current_extension:
-                return ext
-        return None
+        return self._get_or_create_ext_config(self.config.current_extension)
 
     def _toggle_distinct_mode(self):
         """Toggle distinct mode for current extension."""
-        ext_config = self._get_current_ext_config()
-        if ext_config:
-            ext_config.distinct_mode = not ext_config.distinct_mode
-        else:
+        if not self.config.current_extension:
             self.message = "Select an extension first"
             self.message_is_error = True
+            return
+        ext_config = self._get_current_ext_config()
+        ext_config.distinct_mode = not ext_config.distinct_mode
+        self.message = f"Distinct mode: {'ON' if ext_config.distinct_mode else 'OFF'}"
+        self.message_is_error = False
 
     def _toggle_dark_mode(self):
         self.config.display.dark_mode = not self.config.display.dark_mode
@@ -519,34 +532,45 @@ class BambamTUI:
                 item.action()
 
         elif key == curses.KEY_LEFT:
-            # Decrease value for current item
-            item = self.current_menu.items[self.current_menu.selected]
-            if 'Min' in item.label or 'Max' in item.label:
-                if 'Mode' in self.current_menu.title or 'Keypress' in self.current_menu.title:
-                    if 'Mode' in item.label and 'Min' in item.label:
-                        self._adjust_value('mode_min', -10)
-                    elif 'Mode' in item.label and 'Max' in item.label:
-                        self._adjust_value('mode_max', -10)
-                    elif 'Background' in item.label or 'bg' in item.label.lower():
-                        if 'Min' in item.label:
-                            self._adjust_value('bg_min', -10)
-                        else:
-                            self._adjust_value('bg_max', -10)
+            # Decrease value for current item in Keypress Trigger menu
+            self._handle_arrow_adjust(-10)
 
         elif key == curses.KEY_RIGHT:
-            # Increase value for current item
-            item = self.current_menu.items[self.current_menu.selected]
-            if 'Min' in item.label or 'Max' in item.label:
-                if 'Mode' in self.current_menu.title or 'Keypress' in self.current_menu.title:
-                    if 'Mode' in item.label and 'Min' in item.label:
-                        self._adjust_value('mode_min', 10)
-                    elif 'Mode' in item.label and 'Max' in item.label:
-                        self._adjust_value('mode_max', 10)
-                    elif 'Background' in item.label or 'bg' in item.label.lower():
-                        if 'Min' in item.label:
-                            self._adjust_value('bg_min', 10)
-                        else:
-                            self._adjust_value('bg_max', 10)
+            # Increase value for current item in Keypress Trigger menu
+            self._handle_arrow_adjust(10)
+
+    def _handle_arrow_adjust(self, delta: int):
+        """Handle left/right arrow key adjustments for keypress trigger values."""
+        if 'Keypress' not in self.current_menu.title:
+            return
+
+        item = self.current_menu.items[self.current_menu.selected]
+        idx = self.current_menu.selected
+
+        # Menu structure (indices after Back and separator):
+        # 2: "═══ Random Mode Change ═══"
+        # 3: "Enable Mode Change"
+        # 4: "Min Keypresses" (mode_min)
+        # 5: "Max Keypresses" (mode_max)
+        # 6: separator
+        # 7: "═══ Random Background Change ═══"
+        # 8: "Enable Background Change"
+        # 9: "Min Keypresses" (bg_min)
+        # 10: "Max Keypresses" (bg_max)
+
+        # Determine which value to adjust based on position and label
+        if 'Min' in item.label or 'Max' in item.label:
+            # Check if we're in Mode section (idx 4-5) or Background section (idx 9-10)
+            if idx <= 5:  # Mode section
+                if 'Min' in item.label:
+                    self._adjust_value('mode_min', delta)
+                else:
+                    self._adjust_value('mode_max', delta)
+            else:  # Background section
+                if 'Min' in item.label:
+                    self._adjust_value('bg_min', delta)
+                else:
+                    self._adjust_value('bg_max', delta)
 
         elif key == curses.KEY_BACKSPACE or key == 127:
             self._go_back()

@@ -246,24 +246,43 @@ class Bambam:
             return None
 
     def _init_keypress_triggers(self, args):
-        """Initialize keypress-based triggers from config."""
-        config = self._runtime_config
-        if not config:
-            return
-
+        """Initialize keypress-based triggers from config and CLI args."""
+        config = self._runtime_config or {}
         triggers = config.get('keypress_triggers', {})
 
-        # Mode change trigger
-        if triggers.get('mode_change_enabled', False):
-            min_val = triggers.get('mode_change_min', 50)
-            max_val = triggers.get('mode_change_max', 150)
+        # Store args for later use in reload
+        self._args = args
+
+        # Mode change trigger - enabled by --all-modes flag OR config
+        mode_change_enabled = (
+            self._all_modes_enabled or
+            triggers.get('mode_change_enabled', False)
+        )
+
+        if mode_change_enabled and self._available_extensions:
+            # CLI args take precedence over config
+            min_val = args.mode_change_min if hasattr(args, 'mode_change_min') else triggers.get('mode_change_min', 50)
+            max_val = args.mode_change_max if hasattr(args, 'mode_change_max') else triggers.get('mode_change_max', 150)
+            # Validate min <= max to prevent ValueError
+            if min_val > max_val:
+                min_val, max_val = max_val, min_val
+            self._mode_change_min = min_val
+            self._mode_change_max = max_val
             self._next_mode_change_at = self._random.randint(min_val, max_val)
             logging.debug('Next mode change at keypress %d', self._next_mode_change_at)
 
         # Background change trigger
-        if triggers.get('background_change_enabled', False):
-            min_val = triggers.get('background_change_min', 30)
-            max_val = triggers.get('background_change_max', 100)
+        bg_change_enabled = triggers.get('background_change_enabled', False)
+
+        if bg_change_enabled and self._background_images:
+            # CLI args take precedence over config
+            min_val = args.bg_change_min if hasattr(args, 'bg_change_min') else triggers.get('background_change_min', 30)
+            max_val = args.bg_change_max if hasattr(args, 'bg_change_max') else triggers.get('background_change_max', 100)
+            # Validate min <= max to prevent ValueError
+            if min_val > max_val:
+                min_val, max_val = max_val, min_val
+            self._bg_change_min = min_val
+            self._bg_change_max = max_val
             self._next_bg_change_at = self._random.randint(min_val, max_val)
             logging.debug('Next background change at keypress %d', self._next_bg_change_at)
 
@@ -280,7 +299,7 @@ class Bambam:
             self._trigger_background_change()
 
     def _trigger_mode_change(self):
-        """Trigger a random mode/extension change."""
+        """Trigger a random mode/extension change and reload mappers."""
         if not self._available_extensions:
             return
 
@@ -290,15 +309,55 @@ class Bambam:
             while new_idx == self._current_extension_idx:
                 new_idx = self._random.randint(0, len(self._available_extensions) - 1)
             self._current_extension_idx = new_idx
-            logging.info('Mode changed to: %s', self._available_extensions[self._current_extension_idx])
+            new_extension = self._available_extensions[self._current_extension_idx]
+            logging.info('Mode changed to: %s', new_extension)
 
-        # Schedule next mode change
-        config = self._runtime_config
-        if config:
-            triggers = config.get('keypress_triggers', {})
-            min_val = triggers.get('mode_change_min', 50)
-            max_val = triggers.get('mode_change_max', 150)
-            self._next_mode_change_at = self._keypress_count + self._random.randint(min_val, max_val)
+            # Actually reload the extension mappers so the change takes effect
+            self._reload_extension(new_extension)
+
+        # Schedule next mode change using stored values
+        min_val = getattr(self, '_mode_change_min', 50)
+        max_val = getattr(self, '_mode_change_max', 150)
+        # Validate min <= max to prevent ValueError
+        if min_val > max_val:
+            min_val, max_val = max_val, min_val
+        self._next_mode_change_at = self._keypress_count + self._random.randint(min_val, max_val)
+
+    def _reload_extension(self, extension_name: str):
+        """Reload mappers and resources for the specified extension."""
+        if not _YAML_LOADED:
+            return
+
+        try:
+            # Load extension sounds
+            if self._sound_enabled:
+                extension_sounds = self.load_items(
+                    self.glob_extension(['.wav', '.ogg'], extension_name),
+                    [],
+                    self.load_sound,
+                    _("All extension sounds failed to load."))
+                if extension_sounds:
+                    self._add_sound_policy('named_file', NamedFilePolicy(extension_sounds))
+
+            # Load extension images
+            extension_images = self.load_items(
+                self.glob_extension(['.gif', '.jpg', '.jpeg', '.png', '.tif', '.tiff'], extension_name),
+                [],
+                self.load_image,
+                _("Extension images not found (optional)."))
+            if extension_images:
+                self._add_image_policy('named_file', NamedFilePolicy(extension_images))
+
+            # Reload mappers
+            self._sound_mapper, self._image_mapper = self._get_extension_mappers(extension_name)
+            logging.info('Reloaded extension mappers for: %s', extension_name)
+
+        except ResourceLoadException as e:
+            logging.warning('Failed to reload extension %s: %s', extension_name, e)
+            # Fall back to legacy mappers
+            self._image_mapper = LegacyImageMapper()
+            if self._sound_enabled:
+                self._sound_mapper = LegacySoundMapper(False)
 
     def _trigger_background_change(self):
         """Trigger a random background change."""
@@ -314,13 +373,13 @@ class Bambam:
             self._apply_background_image()
             logging.info('Background changed to index: %d', self._current_background_idx)
 
-        # Schedule next background change
-        config = self._runtime_config
-        if config:
-            triggers = config.get('keypress_triggers', {})
-            min_val = triggers.get('background_change_min', 30)
-            max_val = triggers.get('background_change_max', 100)
-            self._next_bg_change_at = self._keypress_count + self._random.randint(min_val, max_val)
+        # Schedule next background change using stored values
+        min_val = getattr(self, '_bg_change_min', 30)
+        max_val = getattr(self, '_bg_change_max', 100)
+        # Validate min <= max to prevent ValueError
+        if min_val > max_val:
+            min_val, max_val = max_val, min_val
+        self._next_bg_change_at = self._keypress_count + self._random.randint(min_val, max_val)
 
     def _load_background_images(self, args):
         """Load available background images."""
