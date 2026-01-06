@@ -159,13 +159,34 @@ class Bambam:
 
     def get_color(self):
         """
-        Return bright color varying over time.
+        Return bright color varying over time, optionally using theme colors.
         """
-        # Dividing by two results in a rate of change similar to the legacy
-        # method of generating current color, based on current time.
-        hue = int(self._event_count // 2) % self._HUE_SPACE
+        # Check if we have an active theme with a color palette
+        if self._current_theme and 'color_palette' in self._current_theme:
+            palette = self._current_theme['color_palette']
+            if palette:
+                # Cycle through theme colors
+                index = (self._event_count // 10) % len(palette)
+                rgb = palette[index]
+                return Color(rgb[0], rgb[1], rgb[2])
+        
+        # Default behavior: cycling HSV colors
+        # Apply theme hue_speed if available
+        hue_speed = 1.0
+        if self._current_theme and 'hue_speed' in self._current_theme:
+            hue_speed = self._current_theme['hue_speed']
+        
+        hue = int(self._event_count // 2 * hue_speed) % self._HUE_SPACE
         color = Color('white')
-        color.hsva = (hue, 100, 100, 100)
+        
+        # Apply theme saturation and brightness if available
+        saturation = 100
+        brightness = 100
+        if self._current_theme:
+            saturation = self._current_theme.get('saturation', 100)
+            brightness = self._current_theme.get('brightness', 100)
+        
+        color.hsva = (hue, saturation, brightness, 100)
         return color
 
     @classmethod
@@ -252,12 +273,140 @@ class Bambam:
         self._available_extensions = []
         self._current_extension_index = 0
         self._all_modes_enabled = False
+        
+        # Theme support
+        self._current_theme = None
+        self._available_themes = {}
+        self._rainbow_mode = False
+        
+        # Pattern matching support
+        self._patterns = []
+        self._pattern_enabled = False
 
     def _add_image_policy(self, name, policy):
         self._image_policies[name] = policy
 
     def _add_sound_policy(self, name, policy):
         self._sound_policies[name] = policy
+
+    def _load_themes(self):
+        """Load theme definitions from configuration."""
+        themes_config = self._config.get('themes', {})
+        self._available_themes = themes_config.get('definitions', {})
+        
+        # Set active theme if specified
+        active_theme_name = themes_config.get('active_theme')
+        if active_theme_name and active_theme_name in self._available_themes:
+            self._apply_theme(active_theme_name)
+            logging.info("Loaded theme: %s", active_theme_name)
+    
+    def _apply_theme(self, theme_name):
+        """Apply a theme by name."""
+        if theme_name not in self._available_themes:
+            logging.warning("Theme '%s' not found", theme_name)
+            return False
+        
+        self._current_theme = self._available_themes[theme_name]
+        
+        # Update background color if specified
+        if 'background_color' in self._current_theme:
+            rgb = self._current_theme['background_color']
+            self.background_color = tuple(rgb)
+            self.background.fill(self.background_color)
+            if self._background_image_surface:
+                self._apply_background_image()
+            else:
+                self.screen.blit(self.background, (0, 0))
+            pygame.display.flip()
+        
+        logging.info("Applied theme: %s - %s", 
+                    self._current_theme.get('name', theme_name),
+                    self._current_theme.get('description', ''))
+        return True
+    
+    def _load_patterns(self):
+        """Load keypress pattern definitions from configuration."""
+        patterns_config = self._config.get('patterns', {})
+        self._pattern_enabled = patterns_config.get('enabled', False)
+        
+        if not self._pattern_enabled:
+            return
+        
+        self._patterns = patterns_config.get('sequences', [])
+        if self._patterns:
+            logging.info("Loaded %d keypress patterns", len(self._patterns))
+    
+    def _check_patterns(self, sequence):
+        """Check if the current sequence matches any patterns."""
+        if not self._pattern_enabled or not self._patterns:
+            return False
+        
+        for pattern_def in self._patterns:
+            pattern = pattern_def.get('pattern', '').lower()
+            if not pattern:
+                continue
+            
+            if sequence.find(pattern) > -1:
+                action = pattern_def.get('action', '')
+                message = pattern_def.get('message', '')
+                
+                logging.info("Pattern matched: %s -> %s", pattern, action)
+                if message:
+                    logging.info("Pattern message: %s", message)
+                
+                # Execute pattern action
+                self._execute_pattern_action(action, pattern_def)
+                
+                # Clear sequence after match to avoid repeated triggers
+                self.sequence = ''
+                return True
+        
+        return False
+    
+    def _execute_pattern_action(self, action, pattern_def):
+        """Execute an action triggered by a pattern match."""
+        if action == 'clear_screen':
+            self.screen.blit(self.background, (0, 0))
+            pygame.display.flip()
+            logging.debug("Pattern action: cleared screen")
+        
+        elif action == 'change_theme':
+            # Cycle to next available theme
+            if self._available_themes:
+                theme_names = list(self._available_themes.keys())
+                if self._current_theme:
+                    current_name = self._current_theme.get('name')
+                    # Find current theme index
+                    current_idx = -1
+                    for i, name in enumerate(theme_names):
+                        if self._available_themes[name].get('name') == current_name:
+                            current_idx = i
+                            break
+                    # Move to next theme
+                    next_idx = (current_idx + 1) % len(theme_names)
+                    next_theme = theme_names[next_idx]
+                else:
+                    next_theme = theme_names[0]
+                
+                self._apply_theme(next_theme)
+                logging.debug("Pattern action: changed theme to %s", next_theme)
+        
+        elif action == 'rainbow_mode':
+            self._rainbow_mode = not self._rainbow_mode
+            if self._rainbow_mode:
+                # Store original theme and switch to rainbow
+                if 'rainbow' in self._available_themes:
+                    self._apply_theme('rainbow')
+            logging.debug("Pattern action: rainbow mode %s", 
+                         "enabled" if self._rainbow_mode else "disabled")
+        
+        elif action == 'random_theme':
+            # Apply a random theme
+            if self._available_themes:
+                theme_names = list(self._available_themes.keys())
+                random_theme = self._random.choice(theme_names)
+                self._apply_theme(random_theme)
+                logging.debug("Pattern action: applied random theme %s", random_theme)
 
     def _load_background_image(self, image_path):
         """Load and scale a background image to fit the screen."""
@@ -394,9 +543,14 @@ class Bambam:
     def _maybe_process_command(self, last_keypress: str):
         """
         Keeps track of recently pressed keys and acts if they contain
-        a valid command.
+        a valid command or pattern.
         """
         self.sequence += last_keypress.lower()
+        
+        # Check for custom patterns first
+        if self._check_patterns(self.sequence):
+            return
+        
         if self.sequence.find(_(QUIT_STRING).lower()) > -1:
             sys.exit(0)
         if self.sequence.find(_(MOUSE_TOGGLE_STRING).lower()) > -1:
@@ -809,6 +963,10 @@ class Bambam:
 
         self._load_resources(args)
         self._prepare_screen(args)
+
+        # Load themes and patterns after resources and screen are ready
+        self._load_themes()
+        self._load_patterns()
 
         # Setup random change counters
         self._setup_random_counters()

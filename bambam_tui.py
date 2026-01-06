@@ -339,7 +339,9 @@ class TUI:
                 MenuItem("", "separator"),
                 MenuItem("⚙ General Settings", "submenu", "general"),
                 MenuItem("🎵 Mode/Extension Settings", "submenu", "modes"),
+                MenuItem("🎨 Theme Settings", "submenu", "themes"),
                 MenuItem("🖼 Background Settings", "submenu", "background"),
+                MenuItem("🔑 Keypress Patterns", "submenu", "patterns"),
                 MenuItem("🔊 Audio Settings", "submenu", "audio"),
                 MenuItem("📺 Display Settings", "submenu", "display"),
                 MenuItem("🔧 Advanced Settings", "submenu", "advanced"),
@@ -435,6 +437,48 @@ class TUI:
                 MenuItem("Prefer OGG Format", "toggle",
                          self.get_config_value(['audio', 'prefer_ogg']),
                          config_path=['audio', 'prefer_ogg']),
+            ]
+
+        elif self.current_menu == "themes":
+            # Get available themes
+            themes_config = self.get_config_value(['themes', 'definitions']) or {}
+            theme_names = ["None"] + list(themes_config.keys())
+            current_theme = self.get_config_value(['themes', 'active_theme']) or "None"
+            
+            return [
+                MenuItem("← Back to Main Menu", "action", "back"),
+                MenuItem("", "separator"),
+                MenuItem("Active Theme", "select", current_theme,
+                         options=theme_names,
+                         config_path=['themes', 'active_theme']),
+                MenuItem("", "separator"),
+                MenuItem("── Available Themes ──", "label"),
+                MenuItem("  rainbow: Cycling rainbow colors", "label"),
+                MenuItem("  ocean: Blue and turquoise", "label"),
+                MenuItem("  forest: Green forest theme", "label"),
+                MenuItem("  sunset: Warm sunset colors", "label"),
+                MenuItem("  space: Dark space with bright stars", "label"),
+                MenuItem("  pastel: Soft pastel colors", "label"),
+            ]
+        
+        elif self.current_menu == "patterns":
+            patterns_config = self.get_config_value(['patterns', {}])
+            enabled = patterns_config.get('enabled', False)
+            
+            return [
+                MenuItem("← Back to Main Menu", "action", "back"),
+                MenuItem("", "separator"),
+                MenuItem("Enable Pattern Matching", "toggle",
+                         self.get_config_value(['patterns', 'enabled']),
+                         config_path=['patterns', 'enabled']),
+                MenuItem("", "separator"),
+                MenuItem("── Predefined Patterns ──", "label"),
+                MenuItem("  abcd: Clear screen", "label"),
+                MenuItem("  1234: Change theme", "label"),
+                MenuItem("  rainbow: Toggle rainbow mode", "label"),
+                MenuItem("", "separator"),
+                MenuItem("Note: Pattern actions trigger when", "label"),
+                MenuItem("you type the pattern during play", "label"),
             ]
 
         elif self.current_menu == "display":
