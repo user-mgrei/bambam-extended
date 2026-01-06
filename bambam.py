@@ -156,6 +156,7 @@ def poll_for_any_key_press(clock):
 class Bambam:
     IMAGE_MAX_WIDTH = 700
     _HUE_SPACE = 360
+    _COLOR_CYCLE_SPEED = 10  # Speed divider for color palette cycling
 
     def get_color(self):
         """
@@ -165,8 +166,8 @@ class Bambam:
         if self._current_theme and 'color_palette' in self._current_theme:
             palette = self._current_theme['color_palette']
             if palette:
-                # Cycle through theme colors
-                index = (self._event_count // 10) % len(palette)
+                # Cycle through theme colors at a consistent speed
+                index = (self._event_count // self._COLOR_CYCLE_SPEED) % len(palette)
                 rgb = palette[index]
                 return Color(rgb[0], rgb[1], rgb[2])
         
@@ -276,6 +277,7 @@ class Bambam:
         
         # Theme support
         self._current_theme = None
+        self._current_theme_key = None  # Track current theme key for cycling
         self._available_themes = {}
         self._rainbow_mode = False
         
@@ -307,6 +309,7 @@ class Bambam:
             return False
         
         self._current_theme = self._available_themes[theme_name]
+        self._current_theme_key = theme_name  # Track the key for cycling
         
         # Update background color if specified
         if 'background_color' in self._current_theme:
@@ -346,7 +349,8 @@ class Bambam:
             if not pattern:
                 continue
             
-            if sequence.find(pattern) > -1:
+            # Use endswith to avoid false positives from substring matches
+            if sequence.endswith(pattern):
                 action = pattern_def.get('action', '')
                 message = pattern_def.get('message', '')
                 
@@ -371,30 +375,25 @@ class Bambam:
             logging.debug("Pattern action: cleared screen")
         
         elif action == 'change_theme':
-            # Cycle to next available theme
+            # Cycle to next available theme using tracked key
             if self._available_themes:
-                theme_names = list(self._available_themes.keys())
-                if self._current_theme:
-                    current_name = self._current_theme.get('name')
-                    # Find current theme index
-                    current_idx = -1
-                    for i, name in enumerate(theme_names):
-                        if self._available_themes[name].get('name') == current_name:
-                            current_idx = i
-                            break
-                    # Move to next theme
-                    next_idx = (current_idx + 1) % len(theme_names)
-                    next_theme = theme_names[next_idx]
+                theme_keys = list(self._available_themes.keys())
+                if self._current_theme_key and self._current_theme_key in theme_keys:
+                    # Find current index and move to next
+                    current_idx = theme_keys.index(self._current_theme_key)
+                    next_idx = (current_idx + 1) % len(theme_keys)
                 else:
-                    next_theme = theme_names[0]
+                    # No current theme, start at first
+                    next_idx = 0
                 
-                self._apply_theme(next_theme)
-                logging.debug("Pattern action: changed theme to %s", next_theme)
+                next_theme_key = theme_keys[next_idx]
+                self._apply_theme(next_theme_key)
+                logging.debug("Pattern action: changed theme to %s", next_theme_key)
         
         elif action == 'rainbow_mode':
             self._rainbow_mode = not self._rainbow_mode
             if self._rainbow_mode:
-                # Store original theme and switch to rainbow
+                # Switch to rainbow theme if available
                 if 'rainbow' in self._available_themes:
                     self._apply_theme('rainbow')
             logging.debug("Pattern action: rainbow mode %s", 
@@ -403,10 +402,10 @@ class Bambam:
         elif action == 'random_theme':
             # Apply a random theme
             if self._available_themes:
-                theme_names = list(self._available_themes.keys())
-                random_theme = self._random.choice(theme_names)
-                self._apply_theme(random_theme)
-                logging.debug("Pattern action: applied random theme %s", random_theme)
+                theme_keys = list(self._available_themes.keys())
+                random_theme_key = self._random.choice(theme_keys)
+                self._apply_theme(random_theme_key)
+                logging.debug("Pattern action: applied random theme %s", random_theme_key)
 
     def _load_background_image(self, image_path):
         """Load and scale a background image to fit the screen."""

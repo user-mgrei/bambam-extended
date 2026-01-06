@@ -91,7 +91,7 @@ patterns:
 
 # Themes - preconfigured color and visual themes
 themes:
-  # Currently active theme (null for default)
+  # Currently active theme (null = default rainbow behavior, or choose from definitions below)
   active_theme: null
   
   # Available theme definitions
