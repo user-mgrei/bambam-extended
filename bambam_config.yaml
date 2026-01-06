@@ -73,3 +73,88 @@ advanced:
   sound_blacklist: []
   # Blacklist patterns for images (glob patterns)
   image_blacklist: []
+
+# Keypress patterns - trigger special actions when specific sequences are typed
+patterns:
+  enabled: true
+  # List of pattern definitions
+  sequences:
+    - pattern: "abcd"
+      action: "clear_screen"
+      message: "Pattern matched: ABCD!"
+    - pattern: "1234"
+      action: "change_theme"
+      message: "Theme changed!"
+    - pattern: "rainbow"
+      action: "rainbow_mode"
+      message: "Rainbow mode activated!"
+
+# Themes - preconfigured color and visual themes
+themes:
+  # Currently active theme (null = default rainbow behavior, or choose from definitions below)
+  active_theme: null
+  
+  # Available theme definitions
+  definitions:
+    rainbow:
+      name: "Rainbow"
+      description: "Cycling rainbow colors"
+      background_color: [0, 0, 0]
+      hue_speed: 1.0
+      saturation: 100
+      brightness: 100
+      
+    ocean:
+      name: "Ocean"
+      description: "Blue and turquoise ocean theme"
+      background_color: [0, 20, 40]
+      color_palette:
+        - [0, 119, 190]    # Ocean blue
+        - [0, 180, 216]    # Sky blue
+        - [72, 202, 228]   # Light cyan
+        - [0, 150, 136]    # Teal
+        - [144, 224, 239]  # Pale blue
+      
+    forest:
+      name: "Forest"
+      description: "Green forest theme"
+      background_color: [20, 40, 20]
+      color_palette:
+        - [76, 175, 80]    # Green
+        - [139, 195, 74]   # Light green
+        - [46, 125, 50]    # Dark green
+        - [205, 220, 57]   # Lime
+        - [51, 105, 30]    # Forest green
+        
+    sunset:
+      name: "Sunset"
+      description: "Warm sunset colors"
+      background_color: [40, 20, 40]
+      color_palette:
+        - [255, 87, 34]    # Deep orange
+        - [255, 152, 0]    # Orange
+        - [255, 193, 7]    # Amber
+        - [244, 67, 54]    # Red
+        - [233, 30, 99]    # Pink
+        
+    space:
+      name: "Space"
+      description: "Dark space with bright stars"
+      background_color: [10, 10, 20]
+      color_palette:
+        - [255, 255, 255]  # White
+        - [255, 235, 59]   # Yellow
+        - [156, 39, 176]   # Purple
+        - [63, 81, 181]    # Indigo
+        - [0, 188, 212]    # Cyan
+        
+    pastel:
+      name: "Pastel"
+      description: "Soft pastel colors"
+      background_color: [245, 245, 245]
+      color_palette:
+        - [255, 205, 210]  # Pink
+        - [225, 190, 231]  # Lavender
+        - [179, 229, 252]  # Light blue
+        - [200, 230, 201]  # Light green
+        - [255, 224, 178]  # Peach

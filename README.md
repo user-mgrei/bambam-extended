@@ -10,6 +10,37 @@ Easy-to-use terminal interface for configuration:
 python3 bambam_tui.py
 ```
 
+### Preconfigured Themes 🎨
+Choose from beautiful predefined themes or use the default rainbow:
+- **Rainbow**: Cycling rainbow colors (default)
+- **Ocean**: Blue and turquoise theme
+- **Forest**: Green nature theme
+- **Sunset**: Warm sunset colors
+- **Space**: Dark space with bright stars
+- **Pastel**: Soft pastel colors
+
+Configure themes via TUI or config file:
+```yaml
+themes:
+  active_theme: ocean  # or rainbow, forest, sunset, space, pastel
+```
+
+### Keypress Patterns 🔑
+Trigger special actions by typing specific sequences during play:
+- Type `abcd` → Clear screen
+- Type `1234` → Change theme
+- Type `rainbow` → Toggle rainbow mode
+
+Add custom patterns in config:
+```yaml
+patterns:
+  enabled: true
+  sequences:
+    - pattern: "abc"
+      action: "clear_screen"
+      message: "Screen cleared!"
+```
+
 ### Cage Compositor Support (Secure Kiosk Mode)
 Run in a secure Wayland kiosk that prevents children from accessing the desktop:
 ```bash
@@ -40,6 +71,10 @@ modes:
     enabled: true
     min_keypresses: 10
     max_keypresses: 50
+themes:
+  active_theme: ocean  # Choose from: rainbow, ocean, forest, sunset, space, pastel
+patterns:
+  enabled: true  # Enable keypress pattern detection
 background:
   images_directory: /path/to/backgrounds
   random_change:
