@@ -10,10 +10,12 @@ This document provides comprehensive documentation of the BamBam Plus codebase f
 4. [Configuration System](#configuration-system)
 5. [Extension System](#extension-system)
 6. [TUI Launcher System](#tui-launcher-system)
-7. [Event Flow](#event-flow)
-8. [File Structure](#file-structure)
-9. [Dependencies](#dependencies)
-10. [Raspberry Pi 5 Deployment](#raspberry-pi-5-deployment)
+7. [Theme System](#theme-system)
+8. [Keypress Pattern System](#keypress-pattern-system)
+9. [Event Flow](#event-flow)
+10. [File Structure](#file-structure)
+11. [Dependencies](#dependencies)
+12. [Raspberry Pi 5 Deployment](#raspberry-pi-5-deployment)
 
 ---
 
@@ -276,6 +278,126 @@ cage:
 
 ---
 
+## Theme System
+
+### Overview (NEW)
+
+The theme system allows customization of colors and visual appearance through predefined themes or custom configurations.
+
+### Theme Structure
+
+Each theme can define:
+- **background_color**: RGB tuple for background
+- **color_palette**: List of RGB colors for cycling
+- **hue_speed**: Multiplier for HSV color cycling speed (default: 1.0)
+- **saturation**: HSV saturation value (0-100)
+- **brightness**: HSV brightness value (0-100)
+
+### Predefined Themes
+
+| Theme | Description | Features |
+|-------|-------------|----------|
+| `rainbow` | Cycling rainbow colors | HSV-based color cycling, default theme |
+| `ocean` | Blue and turquoise | Fixed palette of ocean blues |
+| `forest` | Green nature theme | Fixed palette of forest greens |
+| `sunset` | Warm sunset colors | Fixed palette of oranges, reds, pinks |
+| `space` | Dark space theme | Fixed palette of bright stars on dark background |
+| `pastel` | Soft pastel colors | Fixed palette of soft colors |
+
+### Theme Configuration
+
+```yaml
+themes:
+  active_theme: ocean  # Current theme (null for default rainbow)
+  
+  definitions:
+    custom_theme:
+      name: "My Theme"
+      description: "Custom color theme"
+      background_color: [20, 20, 30]
+      color_palette:
+        - [255, 100, 100]  # RGB colors
+        - [100, 255, 100]
+        - [100, 100, 255]
+```
+
+### Theme Methods
+
+| Method | Description |
+|--------|-------------|
+| `_load_themes()` | Load theme definitions from config |
+| `_apply_theme(name)` | Apply a theme by name |
+| `get_color()` | Get color (modified to use theme palette) |
+
+---
+
+## Keypress Pattern System
+
+### Overview (NEW)
+
+The keypress pattern system detects specific key sequences typed during gameplay and triggers configured actions.
+
+### Pattern Structure
+
+Each pattern defines:
+- **pattern**: String sequence to detect (e.g., "abcd", "1234")
+- **action**: Action to trigger when matched
+- **message**: Optional log message
+
+### Available Actions
+
+| Action | Description |
+|--------|-------------|
+| `clear_screen` | Clears the screen to background |
+| `change_theme` | Cycles to next available theme |
+| `rainbow_mode` | Toggles rainbow theme on/off |
+| `random_theme` | Applies a random theme |
+
+### Pattern Configuration
+
+```yaml
+patterns:
+  enabled: true
+  sequences:
+    - pattern: "abcd"
+      action: "clear_screen"
+      message: "Screen cleared!"
+    
+    - pattern: "1234"
+      action: "change_theme"
+      message: "Theme changed!"
+    
+    - pattern: "rainbow"
+      action: "rainbow_mode"
+      message: "Rainbow mode toggled!"
+    
+    - pattern: "random"
+      action: "random_theme"
+      message: "Random theme applied!"
+```
+
+### Pattern Detection Flow
+
+```
+1. User types key → character added to sequence buffer
+2. _check_patterns() scans all defined patterns
+3. If pattern found in buffer:
+   - Execute pattern action via _execute_pattern_action()
+   - Log message (if defined)
+   - Clear sequence buffer to prevent repeat triggers
+4. Sequence buffer also checked for standard commands (quit, mute, etc.)
+```
+
+### Pattern Methods
+
+| Method | Description |
+|--------|-------------|
+| `_load_patterns()` | Load pattern definitions from config |
+| `_check_patterns(sequence)` | Check if sequence matches any patterns |
+| `_execute_pattern_action(action, pattern_def)` | Execute the matched pattern's action |
+
+---
+
 ## Event Flow
 
 ### Startup Sequence
@@ -285,7 +407,9 @@ main()
 ├── gettext.install('bambam')
 ├── Bambam()
 │   ├── Initialize random generator
-│   └── Initialize empty collections
+│   ├── Initialize empty collections
+│   ├── Initialize theme variables
+│   └── Initialize pattern variables
 └── bambam.run()
     ├── _add_base_dir() for each search path
     ├── argparse.parse_args()
@@ -300,6 +424,8 @@ main()
     │   │   └── _get_extension_mappers()
     │   └── Else: use legacy mappers
     ├── _prepare_screen(args)
+    ├── _load_themes()  # NEW: Load theme system
+    ├── _load_patterns()  # NEW: Load pattern system
     ├── pygame.event.set_grab(True)
     ├── _prepare_welcome_message()
     ├── poll_for_any_key_press()
@@ -315,15 +441,20 @@ Event received
 │   ├── _bump_event_count()
 │   └── process_keypress(event)
 │       ├── _maybe_process_command() [if alpha key]
+│       │   ├── Add character to sequence buffer
+│       │   ├── _check_patterns() [NEW: Check for pattern matches]
+│       │   └── Check for standard commands (quit, mute, etc.)
 │       ├── 10% chance: clear screen
 │       ├── _select_response(event)
 │       │   ├── _map_and_select(sound_mapper, sound_policies)
 │       │   └── _map_and_select(image_mapper, image_policies)
 │       ├── sound.play() [if not muted]
 │       └── _display_image(img)
+│           └── Uses get_color() [NEW: May use theme colors]
 ├── MOUSEMOTION
 │   ├── _bump_event_count()
 │   └── If mouse_pressed: draw_dot()
+│       └── Uses get_color() [NEW: May use theme colors]
 ├── MOUSEBUTTONDOWN
 │   ├── _bump_event_count()
 │   ├── draw_dot()
