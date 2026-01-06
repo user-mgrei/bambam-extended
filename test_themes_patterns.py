@@ -29,7 +29,7 @@ def test_config_loading():
     
     # Test patterns
     patterns = config.get('patterns', {})
-    assert patterns.get('enabled') == True, "Patterns should be enabled"
+    assert patterns.get('enabled') is True, "Patterns should be enabled"
     sequences = patterns.get('sequences', [])
     assert len(sequences) == 3, f"Expected 3 patterns, got {len(sequences)}"
     

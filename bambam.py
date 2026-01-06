@@ -344,6 +344,12 @@ class Bambam:
         if not self._pattern_enabled or not self._patterns:
             return False
         
+        # Limit sequence buffer length to prevent unbounded growth
+        # Keep only last 20 characters as patterns are typically short
+        if len(sequence) > 20:
+            self.sequence = sequence[-20:]
+            sequence = self.sequence
+        
         for pattern_def in self._patterns:
             pattern = pattern_def.get('pattern', '').lower()
             if not pattern:
@@ -378,14 +384,10 @@ class Bambam:
             # Cycle to next available theme using tracked key
             if self._available_themes:
                 theme_keys = list(self._available_themes.keys())
-                if self._current_theme_key and self._current_theme_key in theme_keys:
-                    # Find current index and move to next
-                    current_idx = theme_keys.index(self._current_theme_key)
-                    next_idx = (current_idx + 1) % len(theme_keys)
-                else:
-                    # No current theme, start at first
-                    next_idx = 0
-                
+                # Find current index with fallback to -1 if not found
+                current_idx = theme_keys.index(self._current_theme_key) if self._current_theme_key in theme_keys else -1
+                # Move to next theme
+                next_idx = (current_idx + 1) % len(theme_keys)
                 next_theme_key = theme_keys[next_idx]
                 self._apply_theme(next_theme_key)
                 logging.debug("Pattern action: changed theme to %s", next_theme_key)
