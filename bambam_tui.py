@@ -462,9 +462,6 @@ class TUI:
             ]
         
         elif self.current_menu == "patterns":
-            patterns_config = self.get_config_value(['patterns', {}])
-            enabled = patterns_config.get('enabled', False)
-            
             return [
                 MenuItem("← Back to Main Menu", "action", "back"),
                 MenuItem("", "separator"),
