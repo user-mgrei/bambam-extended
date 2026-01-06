@@ -149,6 +149,15 @@ class FactChecker:
             self.error(f"YAML parse error in {event_map_file}: {e}")
             return False
 
+        # BUG FIX: yaml.safe_load returns None for empty files
+        if event_map is None:
+            self.error(f"Extension {ext_dir.name}: event_map.yaml is empty")
+            return False
+
+        if not isinstance(event_map, dict):
+            self.error(f"Extension {ext_dir.name}: event_map.yaml must contain a YAML mapping")
+            return False
+
         all_ok = True
 
         # Check API version
@@ -179,8 +188,13 @@ class FactChecker:
             # Check that named_file args reference existing files
             sounds_dir = ext_dir / 'sounds'
             for step in event_map['sound']:
+                # BUG FIX: Check that step is a dict before calling .get()
+                if not isinstance(step, dict):
+                    continue  # Already reported in _validate_mappings
                 if step.get('policy') == 'named_file':
                     args = step.get('args', [])
+                    if not isinstance(args, list):
+                        continue  # Malformed args
                     for arg in args:
                         if sounds_dir.exists():
                             sound_file = sounds_dir / arg
@@ -216,7 +230,17 @@ class FactChecker:
 
             # Validate checks
             if 'check' in step:
-                for j, check in enumerate(step['check']):
+                # BUG FIX: Verify step['check'] is a list before iterating
+                checks = step['check']
+                if not isinstance(checks, list):
+                    self.error(f"Extension {ext_name}: {mapping_type}[{i}] 'check' must be a list")
+                    all_ok = False
+                    continue
+                for j, check in enumerate(checks):
+                    if not isinstance(check, dict):
+                        self.error(f"Extension {ext_name}: {mapping_type}[{i}].check[{j}] must be a dict")
+                        all_ok = False
+                        continue
                     if 'type' in check:
                         if check['type'] not in VALID_CHECK_TYPES:
                             self.error(f"Extension {ext_name}: invalid check type '{check['type']}'")

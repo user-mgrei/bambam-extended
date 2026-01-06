@@ -1,6 +1,11 @@
-# BamBam Test Configuration
-# This file is used by the standalone test installation
-version: 1
+# BamBam Configuration
+# ~/.config/bambam-test/config.yaml
+version: 2
+
+# Profile settings
+profile:
+  name: null  # Child's name, or null for default profile
+  track_engagement: true
 
 # Display settings
 display:
@@ -13,19 +18,33 @@ audio:
 
 # Extension settings
 extension:
-  name: null  # Set to "alphanumeric-en_US" to enable
+  name: null  # e.g., "alphanumeric-en_US"
 
-# Mode settings (for future features)
-modes:
-  active: []
-  all_modes: false
+# Theme settings
+theme:
+  name: default  # default, dark, farm, ocean, space, music, nature
 
-# Background settings (for future features)
-background:
-  image: null
-  change_interval: null
-
-# Mode rotation (for future features)
-mode_rotation:
+# Multi-mode settings (run all extensions with random swapping)
+multi_mode:
   enabled: false
-  keypress_range: [10, 20]
+  # Range of keypresses before random extension swap
+  swap_range: [10, 30]
+
+# Background settings
+background:
+  image: null  # Path to custom background image
+  # Range of keypresses before random background swap (null = disabled)
+  swap_range: null  # e.g., [15, 40]
+
+# Theme rotation settings
+theme_rotation:
+  enabled: false
+  # Range of keypresses before random theme swap
+  swap_range: [20, 50]
+
+# Remote control settings (Flask web app)
+remote_control:
+  enabled: false
+  host: "0.0.0.0"
+  port: 8080
+  # Note: Configure Tailscale separately for secure remote access
